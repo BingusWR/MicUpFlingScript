@@ -1,0 +1,139 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+local Folder = Instance.new("Folder", Workspace)
+local Part = Instance.new("Part", Folder)
+local Attachment1 = Instance.new("Attachment", Part)
+Part.Anchored = true
+Part.CanCollide = false
+Part.Transparency = 1
+
+if not getgenv().Network then
+    getgenv().Network = {
+        BaseParts = {},
+        Velocity = Vector3.new(14.46262424, 14.46262424, 14.46262424)
+    }
+
+    Network.RetainPart = function(Part)
+        if typeof(Part) == "Instance" and Part:IsA("BasePart") and Part:IsDescendantOf(Workspace) then
+            table.insert(Network.BaseParts, Part)
+            Part.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
+            Part.CanCollide = false
+        end
+    end
+
+    local function EnablePartControl()
+        LocalPlayer.ReplicationFocus = Workspace
+        RunService.Heartbeat:Connect(function()
+            sethiddenproperty(LocalPlayer, "SimulationRadius", math.huge)
+            for _, Part in pairs(Network.BaseParts) do
+                if Part:IsDescendantOf(Workspace) then
+                    Part.Velocity = Network.Velocity
+                end
+            end
+        end)
+    end
+
+    EnablePartControl()
+end
+
+local function ForcePart(v)
+    if v:IsA("Part") and not v.Anchored and not v.Parent:FindFirstChild("Humanoid") and not v.Parent:FindFirstChild("Head") and v.Name ~= "Handle" then
+        for _, x in next, v:GetChildren() do
+            if x:IsA("BodyAngularVelocity") or x:IsA("BodyForce") or x:IsA("BodyGyro") or x:IsA("BodyPosition") or x:IsA("BodyThrust") or x:IsA("BodyVelocity") or x:IsA("RocketPropulsion") then
+                x:Destroy()
+            end
+        end
+        if v:FindFirstChild("Attachment") then
+            v:FindFirstChild("Attachment"):Destroy()
+        end
+        if v:FindFirstChild("AlignPosition") then
+            v:FindFirstChild("AlignPosition"):Destroy()
+        end
+        if v:FindFirstChild("Torque") then
+            v:FindFirstChild("Torque"):Destroy()
+        end
+        v.CanCollide = false
+        local Torque = Instance.new("Torque", v)
+        Torque.Torque = Vector3.new(100000, 100000, 100000)
+        local AlignPosition = Instance.new("AlignPosition", v)
+        local Attachment2 = Instance.new("Attachment", v)
+        Torque.Attachment0 = Attachment2
+        AlignPosition.MaxForce = 9999999999999999999999999999
+        AlignPosition.MaxVelocity = math.huge
+        AlignPosition.Responsiveness = 90000000000
+        AlignPosition.Attachment0 = Attachment2
+        AlignPosition.Attachment1 = Attachment1
+    end
+end
+
+local function findAndRemoveRopeConstraint()
+    for _, model in ipairs(Workspace:GetChildren()) do
+        if model:IsA("Model") and model.Name == "Model" then
+            local parts = {}
+
+            for _, obj in ipairs(model:GetChildren()) do
+                if obj:IsA("Part") then
+                    table.insert(parts, obj)
+                end
+            end
+
+            if #parts == 2 then
+                local removedPart = false
+
+                for _, part in ipairs(parts) do
+                    local ropeConstraint = part:FindFirstChildOfClass("RopeConstraint")
+                    if ropeConstraint then
+                        ropeConstraint:Destroy()
+                    else
+                        if not removedPart then
+                            part.Anchored = true
+                            part.Position = Vector3.new(9999, 9999, 9999)
+                            part:Destroy()
+                            removedPart = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+findAndRemoveRopeConstraint()
+
+local blackHoleActive = true
+
+local function toggleBlackHole()
+    if blackHoleActive then
+        for _, v in next, Workspace:GetDescendants() do
+            ForcePart(v)
+        end
+
+        Workspace.DescendantAdded:Connect(function(v)
+            if blackHoleActive then
+                ForcePart(v)
+            end
+        end)
+
+        spawn(function()
+            while blackHoleActive do
+                Attachment1.WorldCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
+                RunService.RenderStepped:Wait()
+            end
+        end)
+    end
+end
+
+toggleBlackHole()
+
+spawn(function()
+    while true do
+        if not blackHoleActive then
+            blackHoleActive = true
+            toggleBlackHole()
+        end
+        wait(1)
+    end
+end)
